@@ -1,5 +1,5 @@
 const CACHE_PREFIX = 'quit-smoking-pwa-';
-const CACHE_NAME = `${CACHE_PREFIX}7.1.4-3`;
+const CACHE_NAME = `${CACHE_PREFIX}7.1.4-4`;
 
 function scopedUrl(path) {
   return new URL(path, self.registration.scope).toString();
