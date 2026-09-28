@@ -37,9 +37,9 @@ jobs:
       - name: Point shell and service worker to new build
         run: |
           sed -i 's/index-e762a1c7d4a072393a5ffd092f224f8f.js/index-fbeea0533ba2a1f3044cfe6dd470fd10.js/' index.html
-          sed -i 's/quit-smoking-pwa-7.1.4-2/quit-smoking-pwa-7.1.4-3/' sw.js
+          sed -i 's/7.1.4-2/7.1.4-3/' sw.js
           grep -q 'index-fbeea0533ba2a1f3044cfe6dd470fd10.js' index.html
-          grep -q 'quit-smoking-pwa-7.1.4-3' sw.js
+          grep -q '7.1.4-3' sw.js
 
       - name: Clean staging files and publish
         run: |
