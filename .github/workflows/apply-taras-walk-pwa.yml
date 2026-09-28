@@ -1,6 +1,5 @@
-name: Deploy roaming TARaS PWA
+name: Deploy curious TARaS PWA
 
-# retry with exact CI-generated delta
 on:
   push:
     branches:
@@ -20,7 +19,7 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Apply verified roaming TARaS bundle delta
+      - name: Apply verified curious TARaS bundle delta
         run: |
           python3 -m pip install --quiet bsdiff4
           base64 -d taras-walk.patch.b64 > /tmp/taras-walk.patch
@@ -29,7 +28,7 @@ jobs:
           import bsdiff4
 
           old_name = 'index-6dac06184f411c4bf27c921e92449016.js'
-          new_name = 'index-2af47985157ce8e5b11b1da7c353ed36.js'
+          new_name = 'index-856d6484c0324bb4d037df541ccccdf3.js'
           directory = Path('_expo/static/js/web')
           old_path = directory / old_name
           new_path = directory / new_name
@@ -38,11 +37,10 @@ jobs:
           old = old_path.read_bytes()
           patch = patch_path.read_bytes()
           assert len(old) == 1867853, len(old)
-          assert len(patch) == 3445, len(patch)
+          assert len(patch) == 5454, len(patch)
           new = bsdiff4.patch(old, patch)
-          assert len(new) == 1872132, len(new)
+          assert len(new) == 1879141, len(new)
           assert b'TARaS' in new
-          assert b'reduceMotionChanged' in new
           new_path.write_bytes(new)
 
           html_path = Path('index.html')
@@ -62,11 +60,11 @@ jobs:
 
       - name: Verify public payload
         run: |
-          test -f _expo/static/js/web/index-2af47985157ce8e5b11b1da7c353ed36.js
+          test -f _expo/static/js/web/index-856d6484c0324bb4d037df541ccccdf3.js
           test ! -f _expo/static/js/web/index-6dac06184f411c4bf27c921e92449016.js
-          grep -q 'index-2af47985157ce8e5b11b1da7c353ed36.js' index.html
+          grep -q 'index-856d6484c0324bb4d037df541ccccdf3.js' index.html
           grep -q '7.1.4-4' sw.js
-          grep -q 'TARaS' _expo/static/js/web/index-2af47985157ce8e5b11b1da7c353ed36.js
+          grep -q 'TARaS' _expo/static/js/web/index-856d6484c0324bb4d037df541ccccdf3.js
 
       - name: Commit deployment and clean temporary files
         run: |
@@ -75,5 +73,5 @@ jobs:
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git add -A
-          git commit -m 'Deploy roaming TARaS and stable timer layout'
+          git commit -m 'Deploy curious TARaS behavior'
           git push origin HEAD:main
