@@ -1,0 +1,78 @@
+name: Deploy roaming TARaS PWA
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - .github/workflows/apply-taras-walk-pwa.yml
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - name: Apply verified roaming TARaS bundle delta
+        run: |
+          python3 -m pip install --quiet bsdiff4
+          base64 -d taras-walk.patch.b64 > /tmp/taras-walk.patch
+          python3 - <<'PY'
+          from pathlib import Path
+          import bsdiff4
+
+          old_name = 'index-6dac06184f411c4bf27c921e92449016.js'
+          new_name = 'index-2af47985157ce8e5b11b1da7c353ed36.js'
+          directory = Path('_expo/static/js/web')
+          old_path = directory / old_name
+          new_path = directory / new_name
+          patch_path = Path('/tmp/taras-walk.patch')
+
+          old = old_path.read_bytes()
+          patch = patch_path.read_bytes()
+          assert len(old) == 1867853, len(old)
+          assert len(patch) == 3445, len(patch)
+          new = bsdiff4.patch(old, patch)
+          assert len(new) == 1872132, len(new)
+          assert b'TARaS' in new
+          assert b'reduceMotionChanged' in new
+          new_path.write_bytes(new)
+
+          html_path = Path('index.html')
+          html = html_path.read_text()
+          assert old_name in html
+          html = html.replace(old_name, new_name)
+          assert new_name in html and old_name not in html
+          html_path.write_text(html)
+
+          sw_path = Path('sw.js')
+          sw = sw_path.read_text()
+          assert '7.1.4-3' in sw
+          sw_path.write_text(sw.replace('7.1.4-3', '7.1.4-4'))
+
+          old_path.unlink()
+          PY
+
+      - name: Verify public payload
+        run: |
+          test -f _expo/static/js/web/index-2af47985157ce8e5b11b1da7c353ed36.js
+          test ! -f _expo/static/js/web/index-6dac06184f411c4bf27c921e92449016.js
+          grep -q 'index-2af47985157ce8e5b11b1da7c353ed36.js' index.html
+          grep -q '7.1.4-4' sw.js
+          grep -q 'TARaS' _expo/static/js/web/index-2af47985157ce8e5b11b1da7c353ed36.js
+
+      - name: Commit deployment and clean temporary files
+        run: |
+          rm taras-walk.patch.b64
+          rm .github/workflows/apply-taras-walk-pwa.yml
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -A
+          git commit -m 'Deploy roaming TARaS and stable timer layout'
+          git push origin HEAD:main
