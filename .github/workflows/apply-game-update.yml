@@ -1,0 +1,55 @@
+name: Apply verified game update
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - bundle.patch.b64
+      - .github/workflows/apply-game-update.yml
+
+permissions:
+  contents: write
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout public PWA
+        uses: actions/checkout@v5
+
+      - name: Reconstruct verified bundle
+        run: |
+          python3 -m pip install --quiet bsdiff4
+          base64 -d bundle.patch.b64 > /tmp/bundle.patch
+          python3 - <<'PY'
+          import bsdiff4
+          old_path = '_expo/static/js/web/index-e762a1c7d4a072393a5ffd092f224f8f.js'
+          new_path = '_expo/static/js/web/index-fbeea0533ba2a1f3044cfe6dd470fd10.js'
+          old = open(old_path, 'rb').read()
+          patch = open('/tmp/bundle.patch', 'rb').read()
+          new = bsdiff4.patch(old, patch)
+          open(new_path, 'wb').write(new)
+          assert len(new) == 1794275, len(new)
+          PY
+          test "$(git hash-object _expo/static/js/web/index-fbeea0533ba2a1f3044cfe6dd470fd10.js)" = "bc29cdb61f8c1029bb72cb77b9e3f41bdabf12ec"
+
+      - name: Point shell and service worker to new build
+        run: |
+          sed -i 's/index-e762a1c7d4a072393a5ffd092f224f8f.js/index-fbeea0533ba2a1f3044cfe6dd470fd10.js/' index.html
+          sed -i 's/quit-smoking-pwa-7.1.4-2/quit-smoking-pwa-7.1.4-3/' sw.js
+          grep -q 'index-fbeea0533ba2a1f3044cfe6dd470fd10.js' index.html
+          grep -q 'quit-smoking-pwa-7.1.4-3' sw.js
+
+      - name: Clean staging files and publish
+        run: |
+          rm -f _expo/static/js/web/index-e762a1c7d4a072393a5ffd092f224f8f.js
+          rm -f _expo/static/js/web/index-434026b57e8f95d5370c629d3dc17745.js
+          rm -f bundle.patch.b64
+          rm -f .github/workflows/apply-game-update.yml
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -A
+          git diff --cached --check
+          git commit -m 'Publish improved controls and new distraction games'
+          git push origin HEAD:main
