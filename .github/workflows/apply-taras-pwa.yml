@@ -1,0 +1,71 @@
+name: Deploy TARaS PWA bundle
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - .github/workflows/apply-taras-pwa.yml
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - name: Apply verified TARaS bundle delta
+        run: |
+          python3 -m pip install --quiet bsdiff4
+          base64 -d taras.patch.b64 > /tmp/taras.patch
+          python3 - <<'PY'
+          from pathlib import Path
+          import bsdiff4
+
+          old_name = 'index-fbeea0533ba2a1f3044cfe6dd470fd10.js'
+          new_name = 'index-6dac06184f411c4bf27c921e92449016.js'
+          directory = Path('_expo/static/js/web')
+          old_path = directory / old_name
+          new_path = directory / new_name
+          patch_path = Path('/tmp/taras.patch')
+
+          old = old_path.read_bytes()
+          patch = patch_path.read_bytes()
+          assert len(old) == 1794275, len(old)
+          assert len(patch) == 19964, len(patch)
+          new = bsdiff4.patch(old, patch)
+          assert len(new) == 1867853, len(new)
+          assert b'TARaS' in new
+          new_path.write_bytes(new)
+
+          html_path = Path('index.html')
+          html = html_path.read_text()
+          assert old_name in html
+          html = html.replace(old_name, new_name)
+          assert new_name in html and old_name not in html
+          html_path.write_text(html)
+
+          old_path.unlink()
+          PY
+
+      - name: Verify public payload
+        run: |
+          test -f _expo/static/js/web/index-6dac06184f411c4bf27c921e92449016.js
+          test ! -f _expo/static/js/web/index-fbeea0533ba2a1f3044cfe6dd470fd10.js
+          grep -q 'index-6dac06184f411c4bf27c921e92449016.js' index.html
+          grep -q 'TARaS' _expo/static/js/web/index-6dac06184f411c4bf27c921e92449016.js
+
+      - name: Commit deployment and clean temporary files
+        run: |
+          rm taras.patch.b64
+          rm .github/workflows/apply-taras-pwa.yml
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -A
+          git commit -m 'Deploy TARaS assistant with 1000-reply humor bank'
+          git push origin HEAD:main
