@@ -1,0 +1,20 @@
+{
+  "name": "Бросить курить",
+  "short_name": "Не курить",
+  "description": "Личный план отказа от курения",
+  "lang": "ru",
+  "start_url": "/brosit-kurit-pwa/",
+  "scope": "/brosit-kurit-pwa/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#080D16",
+  "theme_color": "#080D16",
+  "icons": [
+    {
+      "src": "./icon.png",
+      "sizes": "1024x1024",
+      "type": "image/png",
+      "purpose": "any"
+    }
+  ]
+}
