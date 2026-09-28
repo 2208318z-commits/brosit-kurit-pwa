@@ -1,5 +1,6 @@
 name: Deploy roaming TARaS PWA
 
+# retry with exact CI-generated delta
 on:
   push:
     branches:
