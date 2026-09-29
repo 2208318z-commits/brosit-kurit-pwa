@@ -1,0 +1,76 @@
+name: Deploy TARS-style TARaS pivot gait
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - .github/workflows/apply-taras-pivot.yml
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - name: Apply verified TARaS pivot gait bundle delta
+        run: |
+          python3 -m pip install --quiet bsdiff4
+          base64 -d taras-pivot.patch.b64 > /tmp/taras-pivot.patch
+          python3 - <<'PY'
+          from pathlib import Path
+          import bsdiff4
+
+          old_name = 'index-61d3109128612a4d8bc4ef08728dd10b.js'
+          new_name = 'index-893e20386dc140992916f579cbcbb53d.js'
+          directory = Path('_expo/static/js/web')
+          old_path = directory / old_name
+          new_path = directory / new_name
+          patch_path = Path('/tmp/taras-pivot.patch')
+
+          old = old_path.read_bytes()
+          patch = patch_path.read_bytes()
+          assert len(old) == 1879712, len(old)
+          assert len(patch) == 1329, len(patch)
+          new = bsdiff4.patch(old, patch)
+          assert len(new) == 1880650, len(new)
+          assert b'TARaS' in new
+          new_path.write_bytes(new)
+
+          html_path = Path('index.html')
+          html = html_path.read_text()
+          assert old_name in html
+          html = html.replace(old_name, new_name)
+          assert new_name in html and old_name not in html
+          html_path.write_text(html)
+
+          sw_path = Path('sw.js')
+          sw = sw_path.read_text()
+          assert '7.1.4-5' in sw
+          sw_path.write_text(sw.replace('7.1.4-5', '7.1.4-6'))
+
+          old_path.unlink()
+          PY
+
+      - name: Verify public payload
+        run: |
+          test -f _expo/static/js/web/index-893e20386dc140992916f579cbcbb53d.js
+          test ! -f _expo/static/js/web/index-61d3109128612a4d8bc4ef08728dd10b.js
+          grep -q 'index-893e20386dc140992916f579cbcbb53d.js' index.html
+          grep -q '7.1.4-6' sw.js
+
+      - name: Commit deployment and clean temporary files
+        run: |
+          rm taras-pivot.patch.b64
+          rm .github/workflows/apply-taras-pivot.yml
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -A
+          git commit -m 'Deploy TARS-style TARaS pivot gait'
+          git push origin HEAD:main
