@@ -1,0 +1,76 @@
+name: Deploy slower segmented TARaS gait
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - .github/workflows/apply-taras-gait.yml
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - name: Apply verified TARaS gait bundle delta
+        run: |
+          python3 -m pip install --quiet bsdiff4
+          base64 -d taras-gait.patch.b64 > /tmp/taras-gait.patch
+          python3 - <<'PY'
+          from pathlib import Path
+          import bsdiff4
+
+          old_name = 'index-856d6484c0324bb4d037df541ccccdf3.js'
+          new_name = 'index-61d3109128612a4d8bc4ef08728dd10b.js'
+          directory = Path('_expo/static/js/web')
+          old_path = directory / old_name
+          new_path = directory / new_name
+          patch_path = Path('/tmp/taras-gait.patch')
+
+          old = old_path.read_bytes()
+          patch = patch_path.read_bytes()
+          assert len(old) == 1879141, len(old)
+          assert len(patch) == 996, len(patch)
+          new = bsdiff4.patch(old, patch)
+          assert len(new) == 1879712, len(new)
+          assert b'TARaS' in new
+          new_path.write_bytes(new)
+
+          html_path = Path('index.html')
+          html = html_path.read_text()
+          assert old_name in html
+          html = html.replace(old_name, new_name)
+          assert new_name in html and old_name not in html
+          html_path.write_text(html)
+
+          sw_path = Path('sw.js')
+          sw = sw_path.read_text()
+          assert '7.1.4-4' in sw
+          sw_path.write_text(sw.replace('7.1.4-4', '7.1.4-5'))
+
+          old_path.unlink()
+          PY
+
+      - name: Verify public payload
+        run: |
+          test -f _expo/static/js/web/index-61d3109128612a4d8bc4ef08728dd10b.js
+          test ! -f _expo/static/js/web/index-856d6484c0324bb4d037df541ccccdf3.js
+          grep -q 'index-61d3109128612a4d8bc4ef08728dd10b.js' index.html
+          grep -q '7.1.4-5' sw.js
+
+      - name: Commit deployment and clean temporary files
+        run: |
+          rm taras-gait.patch.b64
+          rm .github/workflows/apply-taras-gait.yml
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -A
+          git commit -m 'Deploy slower segmented TARaS gait'
+          git push origin HEAD:main
