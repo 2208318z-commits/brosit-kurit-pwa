@@ -1,0 +1,57 @@
+name: Deploy refined TARaS film gait
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - .github/workflows/deploy-taras-film-gait.yml
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - name: Install bspatch
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y bsdiff
+
+      - name: Apply verified TARaS bundle delta
+        run: |
+          OLD='_expo/static/js/web/index-893e20386dc140992916f579cbcbb53d.js'
+          NEW='_expo/static/js/web/index-1ddd7057117fa1a9f5430d74d9a0ee46.js'
+          test -f "$OLD"
+          test "$(stat -c%s "$OLD")" = '1880650'
+          cat > /tmp/taras.patch.b64 <<'PATCHB64'
+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
+PATCHB64
+          base64 -d /tmp/taras.patch.b64 > /tmp/taras.patch
+          bspatch "$OLD" "$NEW" /tmp/taras.patch
+          test "$(stat -c%s "$NEW")" = '1880985'
+          test "$(git hash-object "$NEW")" = '351ed12e9b05403e65a144bd9a10dd48d143ce10'
+          sed -i 's/index-893e20386dc140992916f579cbcbb53d.js/index-1ddd7057117fa1a9f5430d74d9a0ee46.js/' index.html
+          sed -i 's/7.1.4-6/7.1.4-7/' sw.js
+          git rm "$OLD"
+
+      - name: Verify public payload
+        run: |
+          grep -q 'index-1ddd7057117fa1a9f5430d74d9a0ee46.js' index.html
+          grep -q '7.1.4-7' sw.js
+          test -f '_expo/static/js/web/index-1ddd7057117fa1a9f5430d74d9a0ee46.js'
+
+      - name: Commit deployment and remove one-shot workflow
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git rm .github/workflows/deploy-taras-film-gait.yml
+          git add index.html sw.js _expo/static/js/web
+          git commit -m 'Deploy refined TARaS film-like gait'
+          git push origin HEAD:main
