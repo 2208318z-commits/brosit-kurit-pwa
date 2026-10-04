@@ -1,0 +1,56 @@
+name: Deploy reset-all-data fix
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - .github/workflows/deploy-reset-fix.yml
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - name: Install bspatch
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y bsdiff
+
+      - name: Apply verified reset fix delta
+        run: |
+          OLD='_expo/static/js/web/index-a5dfac3acb6af7d84f3759e1f6b7d637.js'
+          NEW='_expo/static/js/web/index-514d1157fe31680bff015e1cd09693ff.js'
+          test -f "$OLD"
+          test "$(stat -c%s "$OLD")" = '1882505'
+          base64 -d reset-fix.patch.b64 > /tmp/reset-fix.patch
+          test "$(stat -c%s /tmp/reset-fix.patch)" = '646'
+          bspatch "$OLD" "$NEW" /tmp/reset-fix.patch
+          test "$(stat -c%s "$NEW")" = '1882916'
+          test "$(git hash-object "$NEW")" = '3c98ad3729356f41e98698686805cbcf20d8f1a7'
+          sed -i 's/index-a5dfac3acb6af7d84f3759e1f6b7d637.js/index-514d1157fe31680bff015e1cd09693ff.js/' index.html
+          sed -i 's/7.1.4-10/7.1.4-11/' sw.js
+          git rm "$OLD"
+
+      - name: Verify public payload
+        run: |
+          grep -q 'index-514d1157fe31680bff015e1cd09693ff.js' index.html
+          grep -q '7.1.4-11' sw.js
+          test -f '_expo/static/js/web/index-514d1157fe31680bff015e1cd09693ff.js'
+
+      - name: Commit deployment and clean one-shot files
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git rm reset-fix.patch.b64
+          git rm .github/workflows/deploy-reset-fix.yml
+          git add index.html sw.js _expo/static/js/web
+          git commit -m 'Deploy reset-all-data fix'
+          git push origin HEAD:main
